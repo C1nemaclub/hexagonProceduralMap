@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { PMREMGenerator } from 'three/src/extras/PMREMGenerator.js';
-import { ACESFilmicToneMapping, Color, sRGBEncoding } from 'three';
+import { ACESFilmicToneMapping, Color, DoubleSide, sRGBEncoding } from 'three';
 import {
   mergeBufferGeometries,
   ShapeBufferGeometry,
@@ -59,6 +59,8 @@ const controls = new OrbitControls(camera, canvas);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 controls.target.set(0, 0, 0);
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.5;
 /**
  * Renderer
  */
@@ -76,7 +78,7 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const FloatType = THREE.FloatType;
 let envmap;
-const MAX_HEIGHT = 20;
+const MAX_HEIGHT = 10;
 const STONE_HEIGHT = MAX_HEIGHT * 0.8;
 const DIRT_HEIGHT = MAX_HEIGHT * 0.7;
 const GRASS_HEIGHT = MAX_HEIGHT * 0.5;
@@ -117,8 +119,9 @@ const asyncloading = async () => {
       let noise = simplex.noise2D(i * 0.1, j * 0.1) * 1 * 0.5;
       if (noise < 0) {
         noise = Math.abs(noise);
+        //noise = noise * -1;
       }
-      noise = Math.pow(noise, 0.5);
+      noise = Math.pow(noise, 0.2);
 
       makeHex(noise * MAX_HEIGHT, position);
     }
@@ -130,6 +133,53 @@ const asyncloading = async () => {
   let dirtMesh = hexMesh(dirtGeo, textures.dirt);
   let sandMesh = hexMesh(sandGeo, textures.sand);
   scene.add(stoneMesh, grassMesh, dirt2Mesh, dirtMesh, sandMesh);
+
+  let seaMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(17, 17, MAX_HEIGHT * 0.2, 50),
+    new THREE.MeshPhysicalMaterial({
+      envMap: envmap,
+      color: new THREE.Color('#55aaff').convertSRGBToLinear().multiplyScalar(3),
+      ior: 1.4,
+      transmission: 1,
+      transparent: true,
+      thickness: 1,
+      envMapIntensity: 0.2,
+      roughness: 1,
+      metalness: 0.025,
+      roughnessMap: textures.water,
+      metalnessMap: textures.water,
+    })
+  );
+  seaMesh.receiveShadow = true;
+  seaMesh.position.set(0, MAX_HEIGHT * 0.1, 0);
+  scene.add(seaMesh);
+
+  let mapContainer = new THREE.Mesh(
+    new THREE.CylinderGeometry(17.1, 17.1, MAX_HEIGHT * 0.25, 50, 1, true),
+    new THREE.MeshPhysicalMaterial({
+      envMap: envmap,
+      map: textures.dirt,
+      envMapIntensity: 0.2,
+      side: DoubleSide,
+    })
+  );
+  mapContainer.receiveShadow = true;
+  mapContainer.position.set(0, MAX_HEIGHT * 0.125, 0);
+  scene.add(mapContainer);
+
+  let mapFloor = new THREE.Mesh(
+    new THREE.CylinderGeometry(18.5, 18.5, MAX_HEIGHT * 0.1, 50),
+    new THREE.MeshPhysicalMaterial({
+      envMap: envmap,
+      map: textures.dirt2,
+      envMapIntensity: 0.1,
+      side: DoubleSide,
+    })
+  );
+  mapFloor.receiveShadow = true;
+  mapFloor.position.set(0, MAX_HEIGHT * 0.05, 0);
+  scene.add(mapFloor);
+  clouds();
 
   renderer.setAnimationLoop(() => {
     renderer.render(scene, camera);
@@ -169,14 +219,25 @@ const hexGeometry = (height, position) => {
 
 function makeHex(height, position) {
   let geo = hexGeometry(height, position);
+
   if (height > STONE_HEIGHT) {
     stoneGeo = mergeBufferGeometries([geo, stoneGeo]);
+
+    if (Math.random() > 0.5) {
+      stoneGeo = mergeBufferGeometries([stoneGeo, stone(height, position)]);
+    }
   } else if (height > DIRT_HEIGHT) {
     dirtGeo = mergeBufferGeometries([geo, dirtGeo]);
+    if (Math.random() > 0.8) {
+      grassGeo = mergeBufferGeometries([grassGeo, tree(height, position)]);
+    }
   } else if (height > GRASS_HEIGHT) {
     grassGeo = mergeBufferGeometries([geo, grassGeo]);
   } else if (height > SAND_HEIGHT) {
     sandGeo = mergeBufferGeometries([geo, sandGeo]);
+    if (Math.random() > 0.8) {
+      stoneGeo = mergeBufferGeometries([stoneGeo, stone(height, position)]);
+    }
   } else if (height > DIRT2_HEIGHT) {
     dirt2Geo = mergeBufferGeometries([geo, dirt2Geo]);
   }
@@ -195,18 +256,71 @@ function hexMesh(geo, map) {
   return mesh;
 }
 
-const clock = new THREE.Clock();
+function stone(height, position) {
+  const px = Math.random() * 0.4;
+  const pz = Math.random() * 0.4;
 
+  const geo = new THREE.SphereGeometry(Math.random() * 0.3 + 0.1, 7, 7);
+  geo.translate(position.x + px, height, position.y + pz);
+
+  return geo;
+}
+
+function tree(height, position) {
+  const treeHeight = Math.random() * 1 + 1.25;
+
+  const geo = new THREE.CylinderGeometry(0, 1.5, treeHeight, 3);
+  geo.translate(position.x, height + treeHeight * 0 + 1, position.y);
+
+  const geo2 = new THREE.CylinderGeometry(0, 1.15, treeHeight, 3);
+  geo2.translate(position.x, height + treeHeight * 0.6 + 1, position.y);
+
+  const geo3 = new THREE.CylinderGeometry(0, 0.8, treeHeight, 3);
+  geo3.translate(position.x, height + treeHeight * 1.25 + 1, position.y);
+
+  return mergeBufferGeometries([geo, geo2, geo3]);
+}
+
+function clouds() {
+  let geo = new THREE.SphereGeometry(0, 0, 0);
+  let count = Math.floor(Math.pow(Math.random(), 0.45) * 4);
+
+  for (let i = 0; i < count; i++) {
+    const puff1 = new THREE.SphereGeometry(1.2, 7, 7);
+    const puff2 = new THREE.SphereGeometry(1.5, 7, 7);
+    const puff3 = new THREE.SphereGeometry(0.9, 7, 7);
+    console.log(i);
+
+    puff1.translate(-1.85, Math.random() * 0.3, 0);
+    puff2.translate(0, Math.random() * 0.3, 0);
+    puff3.translate(1.85, Math.random() * 0.3, 0);
+
+    const cloudGeo = mergeBufferGeometries([puff1, puff2, puff3]);
+    cloudGeo.translate(
+      Math.random() * 20 - 10,
+      Math.random() * 10 + 12,
+      Math.random() * 20 - 10
+    );
+    cloudGeo.rotateY(Math.random() * Math.PI * 2);
+    geo = mergeBufferGeometries([geo, cloudGeo]);
+  }
+
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshStandardMaterial({
+      envMap: envmap,
+      envMapIntensity: 0.75,
+      flatShading: true,
+    })
+  );
+  scene.add(mesh);
+}
+
+const clock = new THREE.Clock();
 const tick = () => {
   const elapsedTime = clock.getElapsedTime();
-
-  // Update Orbital Controls
   controls.update();
-
-  // Render
   renderer.render(scene, camera);
-
-  // Call tick again on the next frame
   window.requestAnimationFrame(tick);
 };
 
