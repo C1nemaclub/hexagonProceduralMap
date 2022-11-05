@@ -4,7 +4,13 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { PMREMGenerator } from 'three/src/extras/PMREMGenerator.js';
 import { ACESFilmicToneMapping, sRGBEncoding } from 'three';
-import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import {
+  mergeBufferGeometries,
+  ShapeBufferGeometry,
+} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { SimplexNoise } from 'simplex-noise';
+
+import alea from 'alea';
 
 // Debug
 
@@ -46,10 +52,25 @@ scene.add(pointLight);
 /**
  * Sizes
  */
+
 const sizes = {
   width: window.innerWidth,
   height: window.innerHeight,
 };
+
+/**
+ * Camera
+ */
+// Base camera
+const camera = new THREE.PerspectiveCamera(
+  75,
+  sizes.width / sizes.height,
+  0.1,
+  1000
+);
+//camera.position.set(0, 0, 50);
+camera.position.set(-17, 31, 33);
+scene.add(camera);
 
 window.addEventListener('resize', () => {
   // Update sizes
@@ -64,19 +85,6 @@ window.addEventListener('resize', () => {
   renderer.setSize(sizes.width, sizes.height);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 });
-
-/**
- * Camera
- */
-// Base camera
-const camera = new THREE.PerspectiveCamera(
-  75,
-  sizes.width / sizes.height,
-  0.1,
-  100
-);
-camera.position.set(0, 0, 50);
-scene.add(camera);
 
 // Controls
 const controls = new OrbitControls(camera, canvas);
@@ -98,6 +106,7 @@ renderer.physicallyCorrectLights = true;
 
 const FloatType = THREE.FloatType;
 let envmap;
+const MAX_HEIGHT = 25;
 const asyncloading = async () => {
   let pmrem = new PMREMGenerator(renderer);
   let envmapTexture = await new RGBELoader()
@@ -105,10 +114,20 @@ const asyncloading = async () => {
     .loadAsync('/assets/envmap.hdr');
   envmap = pmrem.fromEquirectangular(envmapTexture).texture;
 
-  makeHex(3, new THREE.Vector2(0, 0));
-  for (let i = -10; i < 10; i++) {
-    for (let j = -10; j < 10; j++) {
-      makeHex(3, tileToPosition(i, j));
+  const simplex = new SimplexNoise();
+
+  for (let i = -15; i < 15; i++) {
+    for (let j = -15; j < 15; j++) {
+      let position = tileToPosition(i, j);
+      if (position.length() > 16) continue;
+
+      let noise = simplex.noise2D(i * 0.1, j * 0.1) * 1 * 0.5;
+      if (noise < 0) {
+        noise = Math.abs(noise);
+      }
+      noise = Math.pow(noise, 1.5);
+
+      makeHex(noise * MAX_HEIGHT, position);
     }
   }
 
