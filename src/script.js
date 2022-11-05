@@ -4,10 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { PMREMGenerator } from 'three/src/extras/PMREMGenerator.js';
 import { ACESFilmicToneMapping, Color, DoubleSide, sRGBEncoding } from 'three';
-import {
-  mergeBufferGeometries,
-  ShapeBufferGeometry,
-} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { mergeBufferGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { SimplexNoise } from 'simplex-noise';
 
 // Canvas
@@ -78,11 +75,11 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const FloatType = THREE.FloatType;
 let envmap;
-const MAX_HEIGHT = 10;
-const STONE_HEIGHT = MAX_HEIGHT * 0.8;
-const DIRT_HEIGHT = MAX_HEIGHT * 0.7;
-const GRASS_HEIGHT = MAX_HEIGHT * 0.5;
-const SAND_HEIGHT = MAX_HEIGHT * 0.3;
+const MAX_HEIGHT = 20;
+const STONE_HEIGHT = MAX_HEIGHT * 0.5;
+const DIRT_HEIGHT = MAX_HEIGHT * 0.4;
+const GRASS_HEIGHT = MAX_HEIGHT * 0.3;
+const SAND_HEIGHT = MAX_HEIGHT * 0.2;
 const DIRT2_HEIGHT = MAX_HEIGHT * 0;
 
 const asyncloading = async () => {
@@ -119,10 +116,9 @@ const asyncloading = async () => {
       let noise = simplex.noise2D(i * 0.1, j * 0.1) * 1 * 0.5;
       if (noise < 0) {
         noise = Math.abs(noise);
-        //noise = noise * -1;
       }
-      noise = Math.pow(noise, 0.2);
 
+      noise = Math.pow(noise, 0.6);
       makeHex(noise * MAX_HEIGHT, position);
     }
   }
@@ -177,7 +173,7 @@ const asyncloading = async () => {
     })
   );
   mapFloor.receiveShadow = true;
-  mapFloor.position.set(0, MAX_HEIGHT * 0.05, 0);
+  mapFloor.position.set(0, MAX_HEIGHT * 0.05 - 0.5, 0);
   scene.add(mapFloor);
   clouds();
 
@@ -289,8 +285,6 @@ function clouds() {
     const puff1 = new THREE.SphereGeometry(1.2, 7, 7);
     const puff2 = new THREE.SphereGeometry(1.5, 7, 7);
     const puff3 = new THREE.SphereGeometry(0.9, 7, 7);
-    console.log(i);
-
     puff1.translate(-1.85, Math.random() * 0.3, 0);
     puff2.translate(0, Math.random() * 0.3, 0);
     puff3.translate(1.85, Math.random() * 0.3, 0);
